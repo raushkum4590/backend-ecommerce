@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 JWT Token Cleanup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .status {
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .error {
+            background: #fee;
+            border-left: 4px solid #f44;
+            color: #c33;
+        }
+
+        .success {
+            background: #efe;
+            border-left: 4px solid #4c4;
+            color: #3a3;
+        }
+
+        .info {
+            background: #eef;
+            border-left: 4px solid #44f;
+            color: #33a;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #f44;
+        }
+
+        .btn-danger:hover {
+            background: #d33;
+        }
+
+        .token-list {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .token-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .token-key {
+            font-family: monospace;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .instructions {
+            background: #fff9e6;
+            border-left: 4px solid #ffb300;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .instructions h3 {
+            color: #ff8c00;
+            margin-bottom: 10px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+        }
+
+        .instructions li {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 JWT Token Cleanup Tool</h1>
+
+        <div class="info status">
+            <strong>Why you need this:</strong><br>
+            Your backend JWT secret was upgraded from HS256 to HS512 for better security.
+            Old tokens stored in your browser are now invalid and causing 403 Forbidden errors.
+        </div>
+
+        <div id="status"></div>
+
+        <div id="tokens"></div>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <button onclick="scanTokens()">🔍 Scan for Old Tokens</button>
+            <button onclick="clearAllTokens()" class="btn-danger">🗑️ Clear All JWT Tokens</button>
+            <button onclick="clearAllStorage()" class="btn-danger">💣 Clear Everything</button>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 After Cleaning Tokens:</h3>
+            <ol>
+                <li><strong>Close this page</strong></li>
+                <li><strong>Go to your application</strong> (http://localhost:3000)</li>
+                <li><strong>Login again</strong> with your credentials</li>
+                <li><strong>Try adding items to cart</strong> - Should work now! ✅</li>
+            </ol>
+        </div>
+
+        <div class="instructions">
+            <h3>🧪 Test Your Backend:</h3>
+            <p>After cleaning and logging in again, your cart should work perfectly. The backend is now using:</p>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li>✅ JWT Algorithm: HS512 (512-bit)</li>
+                <li>✅ Circular References: Fixed with @JsonIgnore</li>
+                <li>✅ Database: Cleaned of orphaned records</li>
+                <li>✅ PayPal SDK: Installed and ready</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const possibleTokenKeys = [
+            'token',
+            'authToken',
+            'jwtToken',
+            'jwt',
+            'accessToken',
+            'access_token',
+            'auth_token',
+            'authorization',
+            'bearerToken',
+            'user',
+            'userData',
+            'auth'
+        ];
+
+        function scanTokens() {
+            const foundTokens = [];
+
+            // Scan localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+
+                // Check if it looks like a JWT token
+                if (value && (value.startsWith('eyJ') || possibleTokenKeys.includes(key.toLowerCase()))) {
+                    foundTokens.push({
+                        storage: 'localStorage',
+                        key: key,
+                        value: value.substring(0, 50) + '...'
+                    });
+                }
+            }
+
+            // Scan sessionStorage
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                const value = sessionStorage.getItem(key);
+
+                if (value && (value.startsWith('eyJ') || possibleTokenKeys.includes(key.toLowerCase()))) {
+                    foundTokens.push({
+                        storage: 'sessionStorage',
+                        key: key,
+                        value: value.substring(0, 50) + '...'
+                    });
+                }
+            }
+
+            displayTokens(foundTokens);
+        }
+
+        function displayTokens(tokens) {
+            const tokensDiv = document.getElementById('tokens');
+
+            if (tokens.length === 0) {
+                tokensDiv.innerHTML = `
+                    <div class="success status">
+                        ✅ <strong>No JWT tokens found!</strong><br>
+                        Your storage is clean. You can now login to get a fresh token.
+                    </div>
+                `;
+            } else {
+                let html = `
+                    <div class="error status">
+                        ⚠️ <strong>Found ${tokens.length} potential JWT token(s)</strong><br>
+                        These need to be cleared to fix the 403 error.
+                    </div>
+                    <div class="token-list">
+                `;
+
+                tokens.forEach(token => {
+                    html += `
+                        <div class="token-item">
+                            <div>
+                                <span class="token-key">${token.key}</span>
+                                <br>
+                                <small style="color: #666;">${token.storage}: ${token.value}</small>
+                            </div>
+                            <button onclick="removeSingleToken('${token.storage}', '${token.key}')"
+                                    style="padding: 5px 15px; font-size: 0.9em;">
+                                Remove
+                            </button>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+                tokensDiv.innerHTML = html;
+            }
+        }
+
+        function removeSingleToken(storage, key) {
+            if (storage === 'localStorage') {
+                localStorage.removeItem(key);
+            } else {
+                sessionStorage.removeItem(key);
+            }
+
+            showStatus(`✅ Removed: ${key} from ${storage}`, 'success');
+            scanTokens();
+        }
+
+        function clearAllTokens() {
+            let cleared = 0;
+
+            // Clear potential JWT tokens from localStorage
+            possibleTokenKeys.forEach(key => {
+                if (localStorage.getItem(key)) {
+                    localStorage.removeItem(key);
+                    cleared++;
+                }
+            });
+
+            // Clear tokens that start with 'eyJ' (JWT format)
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                if (value && value.startsWith('eyJ')) {
+                    localStorage.removeItem(key);
+                    cleared++;
+                }
+            }
+
+            // Same for sessionStorage
+            possibleTokenKeys.forEach(key => {
+                if (sessionStorage.getItem(key)) {
+                    sessionStorage.removeItem(key);
+                    cleared++;
+                }
+            });
+
+            for (let i = sessionStorage.length - 1; i >= 0; i--) {
+                const key = sessionStorage.key(i);
+                const value = sessionStorage.getItem(key);
+                if (value && value.startsWith('eyJ')) {
+                    sessionStorage.removeItem(key);
+                    cleared++;
+                }
+            }
+
+            showStatus(`✅ Cleared ${cleared} JWT token(s). You can now login again!`, 'success');
+            scanTokens();
+        }
+
+        function clearAllStorage() {
+            if (confirm('⚠️ This will clear ALL data from localStorage and sessionStorage. Continue?')) {
+                const localCount = localStorage.length;
+                const sessionCount = sessionStorage.length;
+
+                localStorage.clear();
+                sessionStorage.clear();
+
+                showStatus(`✅ Cleared everything! (${localCount + sessionCount} items removed)`, 'success');
+                scanTokens();
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="${type} status">${message}</div>`;
+
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                statusDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        // Auto-scan on load
+        window.onload = function() {
+            scanTokens();
+        };
+    </script>
+</body>
+</html>
+
